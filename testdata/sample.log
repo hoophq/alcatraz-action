@@ -1,0 +1,4 @@
+2026-07-13T10:00:01Z INFO  server started port=8080
+2026-07-13T10:00:04Z INFO  charging card 4532015112830366
+2026-07-13T10:00:05Z DEBUG notify jane@example.com status=ok
+2026-07-13T10:00:06Z INFO  request completed in 42ms
