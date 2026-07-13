@@ -181,8 +181,14 @@ Releases are cut automatically on merge to `main`: label the PR with exactly
 one of `major`, `minor`, `patch`, or `skip-release` (enforced by the
 `PR Release Label Check` workflow). On merge, `auto-release.yml` computes the
 next semver from the highest existing release, creates the GitHub release and
-tag, and re-points the moving major tag (`v1`). Pushing a semver tag by hand
-still works as a fallback via `release.yml`.
+tag, and re-points the moving major tag (`v1`).
+
+If you ever need to release by hand, remember to move the major tag too:
+
+```bash
+git tag v1.2.1 && git push origin v1.2.1
+git tag -f v1 v1.2.1 && git push -f origin v1
+```
 
 ---
 

@@ -125,9 +125,9 @@ jobs:
         run: |
           set -euo pipefail
           # Consumers pin `uses: ${{ github.repository }}@v1`; keep the moving
-          # major tag on the release we just cut. This lives here (not only in
-          # release.yml) because tags created by GITHUB_TOKEN do not trigger
-          # other workflows.
+          # major tag on the release we just cut. This must live in this
+          # workflow: tags created by GITHUB_TOKEN do not trigger other
+          # workflows, so a separate on-tag workflow would never run.
           MAJOR="${NEXT%%.*}"
           git tag -f "$MAJOR" "$SHA"
           git push -f origin "$MAJOR"
