@@ -1,8 +1,7 @@
 name: "Alcatraz PII Scan"
 description: >-
-  Detect PII (emails, credit cards, national IDs, secrets) in PR diffs, log
-  files, PR comments, and issues using hoophq/alcatraz. Posts findings as a
-  sticky PR/issue comment and inline annotations. In-process, no service.
+  Detect PII (emails, credit cards, national IDs, secrets) in PR diffs, logs,
+  comments, and issues using hoophq/alcatraz.
 author: hoophq
 branding:
   icon: shield
