@@ -1,0 +1,49 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    name: Unit tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version: stable
+      - run: go test ./...
+      - run: go vet ./...
+
+      - name: End-to-end on fixture log (expects 2 findings)
+        run: |
+          go build -o /tmp/pii-scan ./cmd/pii-scan
+          out=$(/tmp/pii-scan -mode files -level warning testdata/sample.log)
+          echo "$out"
+          echo "$out" | grep -q "2 finding(s)"
+
+      - name: Allowlist suppresses fixture values (expects 0 findings)
+        run: |
+          out=$(/tmp/pii-scan -mode files -level warning \
+            -allowlist-file .pii-allowlist testdata/sample.log)
+          echo "$out"
+          echo "$out" | grep -q "0 finding(s)"
+
+  self-scan:
+    name: Scan this PR with the action itself
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ./
+        with:
+          # Synthetic fixture values used by our own tests are allowed.
+          allowlist-file: .pii-allowlist

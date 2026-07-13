@@ -1,0 +1,5 @@
+# Values allowed to appear in this repository: they are synthetic fixtures
+# used by the scanner's own tests and testdata. One value per line.
+4532015112830366
+jane@example.com
+536-90-4399

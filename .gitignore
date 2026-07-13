@@ -1,0 +1,18 @@
+# Built binaries
+/pii-scan
+/dist/
+*.exe
+
+# Test and coverage artifacts
+*.test
+*.out
+coverage.html
+
+# Go workspace files (local-only multi-module setup)
+go.work
+go.work.sum
+
+# Editor and OS noise
+.DS_Store
+.idea/
+*.swp

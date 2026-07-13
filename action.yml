@@ -1,0 +1,182 @@
+name: "Alcatraz PII Scan"
+description: >-
+  Detect PII (emails, credit cards, national IDs, secrets) in PR diffs, log
+  files, PR comments, and issues using hoophq/alcatraz. Posts findings as a
+  sticky PR/issue comment and inline annotations. In-process, no service.
+author: hoophq
+branding:
+  icon: shield
+  color: red
+
+inputs:
+  mode:
+    description: >-
+      What to scan. "diff" scans the lines the PR adds (pull_request events);
+      "files" scans the paths given in `paths` (e.g. captured logs);
+      "comment" scans the body of the triggering PR comment, issue comment,
+      or issue (issue_comment / issues events).
+    default: diff
+  paths:
+    description: "Space-separated files/globs to scan when mode=files."
+    default: ""
+  threshold:
+    description: "Minimum confidence score in [0,1]. Alcatraz ships intentionally low-confidence recognizers; 0.8 is a sane CI default."
+    default: "0.8"
+  entities:
+    description: "Comma-separated entity types to restrict detection to (empty = all 45)."
+    default: ""
+  ignore-entities:
+    description: "Comma-separated entity types dropped as noise."
+    default: "DATE_TIME,URL"
+  allowlist-file:
+    description: "Repo path of a file with allowed values, one per line (# comments ok)."
+    default: ""
+  exclude:
+    description: "Comma-separated glob patterns of diff paths to skip when mode=diff."
+    default: "go.sum,*.lock,*.svg,*.min.js,vendor/**,node_modules/**"
+  comment:
+    description: "Post/update a sticky comment with the findings on the PR or issue."
+    default: "true"
+  fail-on-findings:
+    description: "Fail the check when PII is found."
+    default: "true"
+  github-token:
+    description: "Token used to read the PR diff and post comments."
+    default: ${{ github.token }}
+
+outputs:
+  findings:
+    description: "Number of PII findings."
+    value: ${{ steps.scan.outputs.findings }}
+  report-file:
+    description: "Path of the markdown findings report."
+    value: ${{ steps.scan.outputs.report }}
+
+runs:
+  using: composite
+  steps:
+    - uses: actions/setup-go@v5
+      with:
+        go-version: stable
+        cache: false
+
+    - name: Build scanner
+      shell: bash
+      working-directory: ${{ github.action_path }}
+      run: go build -o "$RUNNER_TEMP/pii-scan" ./cmd/pii-scan
+
+    - name: Scan
+      id: scan
+      shell: bash
+      env:
+        GH_TOKEN: ${{ inputs.github-token }}
+        MODE: ${{ inputs.mode }}
+        PATHS: ${{ inputs.paths }}
+        THRESHOLD: ${{ inputs.threshold }}
+        ENTITIES: ${{ inputs.entities }}
+        IGNORE: ${{ inputs.ignore-entities }}
+        ALLOWLIST: ${{ inputs.allowlist-file }}
+        EXCLUDE: ${{ inputs.exclude }}
+        FAIL: ${{ inputs.fail-on-findings }}
+      run: |
+        set -euo pipefail
+
+        REPORT="$RUNNER_TEMP/pii-report.md"
+        echo "report=$REPORT" >> "$GITHUB_OUTPUT"
+
+        LEVEL=warning
+        [ "$FAIL" = "true" ] && LEVEL=error
+
+        MARKER="alcatraz-pii-scan-$MODE"
+        echo "marker=$MARKER" >> "$GITHUB_OUTPUT"
+
+        args=(-threshold "$THRESHOLD" -ignore "$IGNORE" -level "$LEVEL" \
+              -report "$REPORT" -marker "$MARKER")
+        [ -n "$ENTITIES" ]  && args+=(-entities "$ENTITIES")
+        [ -n "$ALLOWLIST" ] && args+=(-allowlist-file "$ALLOWLIST")
+
+        case "$MODE" in
+          diff)
+            PR=$(jq -r '.pull_request.number // .issue.number // empty' "$GITHUB_EVENT_PATH")
+            if [ -z "$PR" ]; then
+              echo "::error::mode=diff needs a pull_request event (no PR number in the event payload)"
+              exit 1
+            fi
+            gh api "repos/$GITHUB_REPOSITORY/pulls/$PR" \
+              -H "Accept: application/vnd.github.diff" \
+              | "$RUNNER_TEMP/pii-scan" -mode diff -exclude "$EXCLUDE" \
+                  -source "this PR's diff" "${args[@]}"
+            ;;
+          files)
+            if [ -z "$PATHS" ]; then
+              echo "::error::mode=files needs the 'paths' input"
+              exit 1
+            fi
+            # Intentionally unquoted: expand user-supplied globs.
+            "$RUNNER_TEMP/pii-scan" -mode files "${args[@]}" $PATHS
+            ;;
+          comment)
+            BODY_JQ='.comment.body // .issue.body // empty'
+            URL=$(jq -r '.comment.html_url // .issue.html_url // empty' "$GITHUB_EVENT_PATH")
+            # Never scan the sticky comment this action maintains.
+            if jq -e --arg m "<!-- $MARKER -->" "($BODY_JQ) | startswith(\$m)" \
+                 "$GITHUB_EVENT_PATH" >/dev/null 2>&1; then
+              echo "Skipping this action's own report comment."
+              # Empty findings output: the comment step will not run.
+              exit 0
+            fi
+            jq -r "$BODY_JQ" "$GITHUB_EVENT_PATH" \
+              | "$RUNNER_TEMP/pii-scan" -mode text \
+                  -source "[this comment]($URL)" "${args[@]}"
+            ;;
+          *)
+            echo "::error::unknown mode '$MODE' (want diff, files, or comment)"
+            exit 1
+            ;;
+        esac
+
+    - name: Post or update sticky comment
+      if: inputs.comment == 'true' && !cancelled() && steps.scan.outputs.findings != ''
+      shell: bash
+      env:
+        GH_TOKEN: ${{ inputs.github-token }}
+        FINDINGS: ${{ steps.scan.outputs.findings }}
+        REPORT: ${{ steps.scan.outputs.report }}
+        MARKER: ${{ steps.scan.outputs.marker }}
+      run: |
+        set -euo pipefail
+
+        NUM=$(jq -r '.pull_request.number // .issue.number // empty' "$GITHUB_EVENT_PATH")
+        if [ -z "$NUM" ]; then
+          echo "No PR or issue in the event payload; skipping comment."
+          exit 0
+        fi
+
+        EXISTING=$(gh api "repos/$GITHUB_REPOSITORY/issues/$NUM/comments" \
+          --paginate --jq ".[] | select(.body | startswith(\"<!-- $MARKER -->\")) | .id" \
+          | head -n1)
+
+        if [ "$FINDINGS" -gt 0 ]; then
+          if [ -n "$EXISTING" ]; then
+            gh api -X PATCH "repos/$GITHUB_REPOSITORY/issues/comments/$EXISTING" \
+              -F body=@"$REPORT" --silent
+          else
+            gh api -X POST "repos/$GITHUB_REPOSITORY/issues/$NUM/comments" \
+              -F body=@"$REPORT" --silent
+          fi
+        elif [ -n "$EXISTING" ]; then
+          # Findings resolved: refresh the stale report to the all-clear.
+          gh api -X PATCH "repos/$GITHUB_REPOSITORY/issues/comments/$EXISTING" \
+            -F body=@"$REPORT" --silent
+        else
+          echo "No findings and no previous report; not commenting."
+        fi
+
+    - name: Enforce
+      if: inputs.fail-on-findings == 'true' && steps.scan.outputs.findings > 0
+      shell: bash
+      env:
+        FINDINGS: ${{ steps.scan.outputs.findings }}
+      run: |
+        echo "::error::$FINDINGS PII finding(s) detected. See the report comment and annotations."
+        exit 1

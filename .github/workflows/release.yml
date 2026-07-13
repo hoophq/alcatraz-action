@@ -1,0 +1,25 @@
+# Manual fallback: keeps the moving major tag (v1, v2, ...) pointed at a
+# release tag pushed by hand (`git tag v1.2.0 && git push origin v1.2.0`).
+# Normal releases go through auto-release.yml on merge to main, which moves
+# the major tag itself, since tags created there by GITHUB_TOKEN don't trigger
+# this workflow.
+name: Release
+
+on:
+  push:
+    tags: ["v[0-9]+.[0-9]+.[0-9]+"]
+
+permissions:
+  contents: write
+
+jobs:
+  major-tag:
+    name: Move major version tag
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Point vN at ${{ github.ref_name }}
+        run: |
+          MAJOR="${GITHUB_REF_NAME%%.*}"
+          git tag -f "$MAJOR" "$GITHUB_REF_NAME"
+          git push -f origin "$MAJOR"
