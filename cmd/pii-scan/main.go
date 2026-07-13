@@ -2,7 +2,9 @@
 // github.com/hoophq/alcatraz, and reports findings in the formats GitHub
 // Actions consumes: workflow annotations, a markdown report (for PR/issue
 // comments and the step summary), and a findings count in GITHUB_OUTPUT.
-//
+// I am going to add something that looks like PII 4532015112830364
+// janee@example.com
+// 534-90-4399
 // Modes:
 //
 //	-mode diff   read a unified diff on stdin, scan added lines only
