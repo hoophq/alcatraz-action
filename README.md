@@ -193,4 +193,4 @@ git tag -f v1 v1.2.1 && git push -f origin v1
 ---
 
 Built on [hoophq/alcatraz](https://github.com/hoophq/alcatraz) by the team
-behind [hoop.dev](https://hoop.dev).
+behind [hoop.dev](https://hoop.dev/start?utm_source=alcatraz-action&utm_medium=github&utm_campaign=att-launch-072026).
