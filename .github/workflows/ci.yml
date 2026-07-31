@@ -34,6 +34,18 @@ jobs:
           echo "$out"
           echo "$out" | grep -q "0 finding(s)"
 
+      - name: Context scoring is switchable (2 findings on, 1 off)
+        run: |
+          printf 'phone: (415) 555-2671\ncard 4532015112830366 charged\n' > /tmp/ctx.txt
+          on=$(/tmp/pii-scan -mode files -level warning -threshold 0.8 \
+            -context=true /tmp/ctx.txt)
+          echo "$on"
+          echo "$on" | grep -q "2 finding(s)"
+          off=$(/tmp/pii-scan -mode files -level warning -threshold 0.8 \
+            -context=false /tmp/ctx.txt)
+          echo "$off"
+          echo "$off" | grep -q "1 finding(s)"
+
   self-scan:
     name: Scan this PR with the action itself
     if: github.event_name == 'pull_request'

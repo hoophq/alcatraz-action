@@ -38,6 +38,7 @@ func run() error {
 	source := flag.String("source", "", "label for what was scanned, used in the report")
 	marker := flag.String("marker", defaultMarker, "sticky-comment marker id embedded in the report")
 	level := flag.String("level", "error", "annotation level: error, warning, or notice")
+	useContext := flag.Bool("context", true, "score a match higher when a word naming its entity type precedes it (-context=false for pattern-only scores)")
 	flag.Parse()
 
 	allowList, err := readAllowlist(*allowlistFile)
@@ -46,6 +47,9 @@ func run() error {
 	}
 	s := newScanner(*threshold, splitList(*entities), splitList(*ignore), allowList)
 	s.exclude = splitList(*exclude)
+	if !*useContext {
+		s.disableContext()
+	}
 
 	var findings []Finding
 	switch *mode {
