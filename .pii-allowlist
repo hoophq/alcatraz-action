@@ -3,3 +3,9 @@
 4532015112830366
 jane@example.com
 536-90-4399
+
+# Context-scoring fixtures: reserved-range values used to show that a labelled
+# match outscores a bare one. 555-01xx numbers and RFC 1918 addresses.
+(415) 555-2671
+415-555-2671
+192.168.1.44
