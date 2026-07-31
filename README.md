@@ -148,8 +148,9 @@ and point the action at it with `allowlist-file: .pii-allowlist`. To narrow
 what's detected instead, set `entities` to the types you care about, or tune
 `threshold`: the default `0.8` keeps checksum-verified identifiers (score
 `1.0`: credit cards, national IDs, IBANs) and drops shape-only matches.
-Lower it (e.g. `0.4`) to also catch emails and phone numbers, which score
-`0.5`.
+Nearby context words lift a match's score, so a labelled `phone: ...` or
+`ip=...` clears `0.8` where the bare value would not. Lower it (e.g. `0.4`)
+to also catch unlabelled emails and phone numbers, which score `0.5`.
 
 ## What gets posted
 
