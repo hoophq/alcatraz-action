@@ -27,6 +27,13 @@ inputs:
   ignore-entities:
     description: "Comma-separated entity types dropped as noise."
     default: "DATE_TIME,URL"
+  context-scoring:
+    description: >-
+      Score a match higher when a word naming its entity type precedes it
+      (e.g. "phone: 415-555-2671" scores 0.85, the bare number 0.5). Set to
+      "false" to score on pattern strength alone, so `threshold` means only
+      how strong the pattern is.
+    default: "true"
   allowlist-file:
     description: "Repo path of a file with allowed values, one per line (# comments ok)."
     default: ""
@@ -74,6 +81,7 @@ runs:
         THRESHOLD: ${{ inputs.threshold }}
         ENTITIES: ${{ inputs.entities }}
         IGNORE: ${{ inputs.ignore-entities }}
+        CONTEXT: ${{ inputs.context-scoring }}
         ALLOWLIST: ${{ inputs.allowlist-file }}
         EXCLUDE: ${{ inputs.exclude }}
         FAIL: ${{ inputs.fail-on-findings }}
@@ -90,7 +98,7 @@ runs:
         echo "marker=$MARKER" >> "$GITHUB_OUTPUT"
 
         args=(-threshold "$THRESHOLD" -ignore "$IGNORE" -level "$LEVEL" \
-              -report "$REPORT" -marker "$MARKER")
+              -context="$CONTEXT" -report "$REPORT" -marker "$MARKER")
         [ -n "$ENTITIES" ]  && args+=(-entities "$ENTITIES")
         [ -n "$ALLOWLIST" ] && args+=(-allowlist-file "$ALLOWLIST")
 

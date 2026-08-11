@@ -131,6 +131,49 @@ func TestScanFile(t *testing.T) {
 	}
 }
 
+// TestContextScoring pins the behavior alcatraz v0.14.0 introduced: a word
+// naming the entity type in front of a match lifts its score. The threshold
+// here is 0.8, the action's default, so each of these values is the
+// difference between a clean scan and a failing one.
+func TestContextScoring(t *testing.T) {
+	tests := []struct {
+		name string
+		text string
+		want int // findings at threshold 0.8 with context scoring on
+	}{
+		{"labelled email", "email: jane@example.com", 1},
+		{"bare email", "ping jane@example.com now", 0},
+		{"labelled ip", "ip 192.168.1.44 hit the api", 1},
+		{"bare ip", "saw 192.168.1.44 today", 0},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			s := newScanner(0.8, nil, []string{"DATE_TIME", "URL"}, nil)
+			findings, err := s.scanText(strings.NewReader(tt.text))
+			if err != nil {
+				t.Fatal(err)
+			}
+			if len(findings) != tt.want {
+				t.Errorf("context on: got %d findings, want %d: %+v",
+					len(findings), tt.want, findings)
+			}
+
+			// Pattern-only scoring never rates these above 0.8, so
+			// disableContext must drop them all regardless of labelling.
+			s = newScanner(0.8, nil, []string{"DATE_TIME", "URL"}, nil)
+			s.disableContext()
+			findings, err = s.scanText(strings.NewReader(tt.text))
+			if err != nil {
+				t.Fatal(err)
+			}
+			if len(findings) != 0 {
+				t.Errorf("context off: got %d findings, want 0: %+v",
+					len(findings), findings)
+			}
+		})
+	}
+}
+
 func TestThresholdDropsLowConfidence(t *testing.T) {
 	// A bare 8-digit run only triggers low-confidence recognizers
 	// (e.g. US_BANK_NUMBER at 0.05); threshold 0.4 must drop it.

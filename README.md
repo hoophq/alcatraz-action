@@ -109,6 +109,7 @@ its own report comments, so it never scans itself in a loop.
 | `threshold` | `0.8` | Minimum confidence in `[0,1]`. Raise for precision, lower for recall |
 | `entities` | all 45 | Comma-separated entity types to restrict to, e.g. `CREDIT_CARD,EMAIL_ADDRESS,US_SSN` |
 | `ignore-entities` | `DATE_TIME,URL` | Entity types dropped as noise |
+| `context-scoring` | `true` | Score a match higher when a word naming its entity type precedes it. `false` scores on pattern strength alone |
 | `allowlist-file` | – | Repo path with allowed values, one per line (`#` comments ok) |
 | `exclude` | `go.sum,*.lock,*.svg,*.min.js,vendor/**,node_modules/**` | Glob patterns of diff paths to skip (`mode: diff`) |
 | `comment` | `true` | Post/update the sticky report comment |
@@ -148,8 +149,14 @@ and point the action at it with `allowlist-file: .pii-allowlist`. To narrow
 what's detected instead, set `entities` to the types you care about, or tune
 `threshold`: the default `0.8` keeps checksum-verified identifiers (score
 `1.0`: credit cards, national IDs, IBANs) and drops shape-only matches.
-Lower it (e.g. `0.4`) to also catch emails and phone numbers, which score
-`0.5`.
+Nearby context words lift a match's score, so a labelled `phone: ...` or
+`ip=...` clears `0.8` where the bare value would not. Lower it (e.g. `0.4`)
+to also catch unlabelled emails and phone numbers, which score `0.5`.
+
+If you'd rather `threshold` mean pattern strength alone — `0.8` as "checksum
+validated, no exceptions" — set `context-scoring: false`. That restores the
+scores a pattern earns on its own, at the cost of the real PII the
+surrounding words would otherwise reveal.
 
 ## What gets posted
 
